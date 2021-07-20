@@ -24,7 +24,7 @@ export const GET_RECAPTCHA_SETTINGS = gql`
 `;
 
 export const UPDATE_FORMS_SETTINGS = gql`
-    mutation updateSettings($data: FormsSettingsInput) {
+    mutation updateSettings($data: FbSettingsInput) {
         formBuilder {
             updateSettings(data: $data) ${fields}
         }

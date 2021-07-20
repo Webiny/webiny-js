@@ -26,7 +26,7 @@ const graphql = {
             }
         `,
     mutation: gql`
-            mutation UpdateSettings($data: FormsSettingsInput) {
+            mutation UpdateSettings($data: FbSettingsInput) {
                 formBuilder {
                     updateSettings(data: $data) ${fields}
                 }
