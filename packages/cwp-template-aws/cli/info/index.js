@@ -4,12 +4,19 @@ const { green } = require("chalk");
 const line = `-------------------------`;
 
 const printEnvOutput = async (env, context) => {
+    let output = await getStackOutput("api", env);
+
     console.log(line);
-    console.log(`Environment: ${green(env)}`);
+    console.log(
+        [
+            `Environment: ${green(env)}`,
+            `AWS region: ${green(output.region ?? "not deployed yet")}`,
+            `Project name: ${green(context.project.name)}`
+        ].join("\n")
+    );
     console.log(line);
 
     let stacksDeployedCount = 0;
-    let output = await getStackOutput("api", env);
     if (output) {
         stacksDeployedCount++;
         console.log(
