@@ -28,7 +28,6 @@ const plugin: CmsEditorFieldRendererPlugin = {
                     {bind => (
                         <Input
                             {...bind}
-                            autoFocus
                             rows={5}
                             label={field.label}
                             placeholder={field.placeholderText}

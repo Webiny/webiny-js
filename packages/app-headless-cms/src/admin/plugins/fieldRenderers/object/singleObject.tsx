@@ -4,6 +4,7 @@ import { CmsEditorFieldRendererPlugin } from "~/types";
 import { Fields } from "~/admin/components/ContentEntryForm/Fields";
 import { SimpleFormHeader } from "@webiny/app-admin/components/SimpleForm";
 import { Grid, Cell } from "@webiny/ui/Grid";
+import { FormElementMessage } from "@webiny/ui/FormElementMessage";
 import { fieldsWrapperStyle } from "./StyledComponents";
 
 const t = i18n.ns("app-headless-cms/admin/fields/text");
@@ -25,6 +26,9 @@ const plugin: CmsEditorFieldRendererPlugin = {
                 <Grid>
                     <Cell span={12}>
                         <SimpleFormHeader title={field.label} />
+                        {field.helpText && (
+                            <FormElementMessage>{field.helpText}</FormElementMessage>
+                        )}
                     </Cell>
                     <Cell span={12} className={fieldsWrapperStyle}>
                         <Fields

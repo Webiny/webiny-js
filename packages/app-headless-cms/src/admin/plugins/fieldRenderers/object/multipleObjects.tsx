@@ -6,6 +6,7 @@ import { Fields } from "~/admin/components/ContentEntryForm/Fields";
 import { ReactComponent as DeleteIcon } from "~/admin/icons/close.svg";
 import { IconButton } from "@webiny/ui/Button";
 import { Cell } from "@webiny/ui/Grid";
+import { FormElementMessage } from "@webiny/ui/FormElementMessage";
 import { Typography } from "@webiny/ui/Typography";
 import Accordion from "~/admin/plugins/fieldRenderers/Accordion";
 import {
@@ -40,6 +41,9 @@ const plugin: CmsEditorFieldRendererPlugin = {
                             <Typography use={"headline5"}>
                                 {`${field.label} ${value.length ? `(${value.length})` : ""}`}
                             </Typography>
+                            {field.helpText && (
+                                <FormElementMessage>{field.helpText}</FormElementMessage>
+                            )}
                         </Cell>
                     )}
                     gridClassName={dynamicSectionGridStyle}
