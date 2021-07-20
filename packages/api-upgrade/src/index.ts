@@ -51,7 +51,7 @@ export function getApplicablePlugin(args: RunUpgradeArgs): UpgradePlugin {
 
     if (upgrades.length > 0) {
         throw new Error(
-            `Skipping of upgrades is not allowed: https://docs.webiny.com/docs/how-to-guides/upgrade-webiny`,
+            `Skipping of upgrades is not allowed: https://www.webiny.com/docs/how-to-guides/upgrade-webiny/overview/`,
             "SKIPPING_UPGRADES_NOT_ALLOWED",
             {
                 deployedVersion: deployedVersion,
