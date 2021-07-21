@@ -71,7 +71,8 @@ describe("defaultFieldIndexPlugin", () => {
         const result = mockModel.fields.reduce(
             (entry, field) => {
                 const { value, rawValue } = plugin.toIndex({
-                    value: mockInputEntry.values[field.fieldId],
+                    rawValue: mockInputEntry.values[field.fieldId],
+                    storageValue: mockInputEntry.values[field.fieldId],
                     getFieldIndexPlugin,
                     getFieldTypePlugin,
                     context: mockContext,

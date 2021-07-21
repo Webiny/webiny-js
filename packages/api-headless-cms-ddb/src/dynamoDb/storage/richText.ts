@@ -1,24 +1,14 @@
 import jsonpack from "jsonpack";
 import WebinyError from "@webiny/error";
-import {
-    CmsContentModel,
-    CmsContentModelField,
-    CmsModelFieldToStoragePlugin
-} from "@webiny/api-headless-cms/types";
+import { CmsModelFieldToStoragePlugin } from "@webiny/api-headless-cms/types";
 
-export type OriginalValue = Record<string, any> | any[];
+export type OriginalValue = Record<string, any> | any[] | null | undefined;
+
 export interface StorageValue {
     compression: string;
     value: any;
 }
 
-interface CreateCacheKeyArgs {
-    model: CmsContentModel;
-    field: CmsContentModelField;
-}
-const createCacheKey = ({ model, field }: CreateCacheKeyArgs): string => {
-    return [model.modelId, field.id].join(".");
-};
 /**
  * Remove when jsonpack gets PR with a fix merged
  * https://github.com/rgcl/jsonpack/pull/25/files
@@ -38,19 +28,12 @@ const transformArray = (value: Record<string, any> | any[]) => {
     return value;
 };
 
-export default (): CmsModelFieldToStoragePlugin<OriginalValue, StorageValue> => {
-    const cache = new Map<string, OriginalValue>();
+export default (): CmsModelFieldToStoragePlugin<OriginalValue, StorageValue | null> => {
     return {
         type: "cms-model-field-to-storage",
         name: "cms-model-field-to-storage-rich-text",
         fieldType: "rich-text",
-        async fromStorage({ model, field, value: storageValue }) {
-            const cacheKey = createCacheKey({ model, field });
-
-            if (cache.has(cacheKey)) {
-                return cache.get(cacheKey);
-            }
-
+        async fromStorage({ field, value: storageValue }) {
             if (!storageValue) {
                 return storageValue;
             } else if (typeof storageValue !== "object") {
@@ -86,16 +69,15 @@ export default (): CmsModelFieldToStoragePlugin<OriginalValue, StorageValue> => 
             }
 
             try {
-                const unpacked = jsonpack.unpack(value);
-
-                cache.set(cacheKey, unpacked);
-
-                return unpacked;
+                return jsonpack.unpack(value);
             } catch {
                 return null;
             }
         },
-        async toStorage({ model, field, value }) {
+        async toStorage({ value }) {
+            if (value === undefined || value === null) {
+                return null;
+            }
             /**
              * There is a possibility that we are trying to compress already compressed value.
              * Introduced a bug with 5.8.0 storage operations, so just return the value to correct it.
@@ -104,13 +86,11 @@ export default (): CmsModelFieldToStoragePlugin<OriginalValue, StorageValue> => 
             if (value && value.hasOwnProperty("compression") === true) {
                 return value as any;
             }
-            const cacheKey = createCacheKey({ model, field });
             value = transformArray(value);
-            const packed = jsonpack.pack(value);
-            cache.set(cacheKey, value);
+
             return {
                 compression: "jsonpack",
-                value: packed
+                value: jsonpack.pack(value)
             };
         }
     };

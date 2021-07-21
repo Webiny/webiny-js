@@ -54,10 +54,98 @@ const ids = {
     field701: shortId.generate(),
     field702: shortId.generate(),
     field703: shortId.generate(),
-    field704: shortId.generate()
+    field704: shortId.generate(),
+    // patient
+    field801: shortId.generate(),
+    field802: shortId.generate(),
+    field803: shortId.generate()
 };
 
 const models: CmsContentModel[] = [
+    // patient
+    {
+        createdOn: new Date(),
+        savedOn: new Date(),
+        locale: "en-US",
+        titleFieldId: "name",
+        lockedFields: [],
+        name: "Patient",
+        description: "Patient model",
+        modelId: "patient",
+        group: {
+            id: contentModelGroup.id,
+            name: contentModelGroup.name
+        },
+        layout: [[ids.field801], [ids.field802], [ids.field803]],
+        fields: [
+            {
+                id: ids.field801,
+                multipleValues: false,
+                helpText: "",
+                label: "Name",
+                type: "text",
+                fieldId: "name",
+                validation: [
+                    {
+                        name: "required",
+                        message: "This field is required"
+                    },
+                    {
+                        name: "minLength",
+                        message: "Enter at least 3 characters",
+                        settings: {
+                            min: 3.0
+                        }
+                    }
+                ],
+                listValidation: [],
+                placeholderText: "placeholder text",
+                predefinedValues: {
+                    enabled: false,
+                    values: []
+                },
+                renderer: {
+                    name: "renderer"
+                }
+            },
+            {
+                id: ids.field802,
+                multipleValues: false,
+                helpText: "",
+                label: "Bio",
+                type: "long-text",
+                fieldId: "bio",
+                validation: [],
+                listValidation: [],
+                placeholderText: "placeholder text",
+                predefinedValues: {
+                    enabled: false,
+                    values: []
+                },
+                renderer: {
+                    name: "renderer"
+                }
+            },
+            {
+                id: ids.field803,
+                multipleValues: true,
+                helpText: "",
+                label: "Prescription",
+                type: "long-text",
+                fieldId: "prescription",
+                validation: [],
+                listValidation: [],
+                placeholderText: "placeholder text",
+                predefinedValues: {
+                    enabled: false,
+                    values: []
+                },
+                renderer: {
+                    name: "renderer"
+                }
+            }
+        ]
+    },
     // category
     {
         createdOn: new Date(),

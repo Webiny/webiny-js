@@ -1,4 +1,4 @@
-import { CmsFieldFilterPathPlugin } from "../../types";
+import { CmsFieldFilterPathPlugin } from "~/types";
 import WebinyError from "@webiny/error";
 
 export default (): CmsFieldFilterPathPlugin => ({

@@ -2,6 +2,7 @@ import cmsFieldTypePlugins from "@webiny/api-headless-cms/content/plugins/graphq
 import defaultIndexingPlugin from "~/elasticsearch/indexing/defaultFieldIndexing";
 import objectIndexing from "~/elasticsearch/indexing/objectIndexing";
 import elasticsearchIndexingPlugins from "~/elasticsearch/indexing";
+import { CmsContentModel, CmsContentModelField, CmsContext } from "@webiny/api-headless-cms/types";
 
 const indexingPlugins = elasticsearchIndexingPlugins();
 const fieldTypePlugins = cmsFieldTypePlugins();
@@ -14,7 +15,21 @@ const getFieldTypePlugin = (fieldType: string) => {
     return fieldTypePlugins.find(pl => pl.fieldType === fieldType);
 };
 
-const objectField = {
+const objectField: CmsContentModelField = {
+    id: "pageField",
+    label: "Page",
+    helpText: "Page",
+    placeholderText: "Page",
+    predefinedValues: {
+        values: [],
+        enabled: false
+    },
+    multipleValues: false,
+    validation: [],
+    listValidation: [],
+    renderer: {
+        name: "pageRenderer"
+    },
     fieldId: "page",
     type: "object",
     settings: {
@@ -125,13 +140,14 @@ describe("objectIndexing", () => {
     test("toIndex should recursively transform an object", () => {
         const plugin = objectIndexing();
         const result = plugin.toIndex({
-            value: input,
+            rawValue: input,
+            storageValue: input,
             field: objectField,
             getFieldIndexPlugin,
             getFieldTypePlugin,
-            context: {},
-            model: {}
-        } as any);
+            context: {} as CmsContext,
+            model: {} as CmsContentModel
+        });
 
         expect(result.value).toEqual(expectedValue);
         expect(result.rawValue).toEqual(expectedRawValue);
@@ -145,9 +161,9 @@ describe("objectIndexing", () => {
             field: objectField,
             getFieldIndexPlugin,
             getFieldTypePlugin,
-            context: {},
-            model: {}
-        } as any);
+            context: {} as CmsContext,
+            model: {} as CmsContentModel
+        });
 
         expect(result).toEqual(input);
     });

@@ -23,9 +23,15 @@ describe("numberIndexing", () => {
         const field: any = {
             fieldId: "number"
         };
-        const result = plugin.toIndex({ value: num, field } as any);
+        const result = plugin.toIndex({
+            rawValue: num,
+            storageValue: num,
+            field
+        } as any);
 
-        expect(result.value).toEqual(expected);
+        expect(result).toEqual({
+            value: expected
+        });
     });
     const strings = [
         ["1", 1],

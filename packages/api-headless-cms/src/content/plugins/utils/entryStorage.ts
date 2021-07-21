@@ -11,7 +11,7 @@ interface GetStoragePluginFactory {
     (context: CmsContext): (fieldType: string) => CmsModelFieldToStoragePlugin<any>;
 }
 
-const getStoragePluginFactory: GetStoragePluginFactory = context => {
+export const getStoragePluginFactory: GetStoragePluginFactory = context => {
     let defaultStoragePlugin: CmsModelFieldToStoragePlugin;
     const storagePlugins = {};
 
@@ -100,6 +100,7 @@ interface EntryFieldFromStorageTransformParams {
     field: CmsContentModelField;
     value: any;
 }
+
 /*
  * A function that is used to transform a single field from storage
  */

@@ -1,4 +1,5 @@
 import slugify from "slugify";
+import zlib from "zlib";
 import { Plugin } from "@webiny/plugins/types";
 import { NotAuthorizedError } from "@webiny/api-security";
 import { SecurityPermission } from "@webiny/api-security/types";
@@ -297,4 +298,27 @@ export const executeCallbacks = async <
             await plugin[hook](args);
         }
     }
+};
+
+export const gzip = (input: zlib.InputType, options?: zlib.ZlibOptions): Promise<Buffer> => {
+    return new Promise(function(resolve, reject) {
+        zlib.gzip(input, options, function(error, result) {
+            if (!error) {
+                resolve(result);
+            } else {
+                reject(error);
+            }
+        });
+    });
+};
+export const ungzip = (input: zlib.InputType, options?: zlib.ZlibOptions): Promise<Buffer> => {
+    return new Promise(function(resolve, reject) {
+        zlib.gunzip(input, options, function(error, result) {
+            if (!error) {
+                resolve(result);
+            } else {
+                reject(error);
+            }
+        });
+    });
 };

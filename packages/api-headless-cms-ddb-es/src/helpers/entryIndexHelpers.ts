@@ -18,11 +18,12 @@ interface ExtractEntriesFromIndexArgs extends SetupEntriesIndexHelpersArgs {
 
 interface PrepareElasticsearchDataArgs extends SetupEntriesIndexHelpersArgs {
     model: CmsContentModel;
+    originalEntry: CmsContentEntry;
     storageEntry: CmsContentEntry;
 }
 
 export const prepareEntryToIndex = (args: PrepareElasticsearchDataArgs): CmsContentIndexEntry => {
-    const { context, storageEntry, model } = args;
+    const { context, storageEntry, originalEntry, model } = args;
     const {
         fieldIndexPlugins,
         defaultIndexFieldPlugin,
@@ -60,7 +61,8 @@ export const prepareEntryToIndex = (args: PrepareElasticsearchDataArgs): CmsCont
                 context,
                 model,
                 field,
-                value: storageEntry.values[field.fieldId],
+                rawValue: originalEntry.values[field.fieldId],
+                storageValue: storageEntry.values[field.fieldId],
                 getFieldIndexPlugin,
                 getFieldTypePlugin
             });

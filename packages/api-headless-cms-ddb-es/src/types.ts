@@ -139,7 +139,15 @@ interface CmsModelFieldToElasticsearchToArgs {
     context: CmsContext;
     model: CmsContentModel;
     field: CmsContentModelField;
-    value: any;
+    /**
+     * A value that was modified by the CmsModelFieldToStoragePlugin plugins.
+     * @see CmsModelFieldToStoragePlugin
+     */
+    storageValue: any;
+    /**
+     * A value without any modifications, directly from the input.
+     */
+    rawValue: any;
     getFieldIndexPlugin(fieldType: string): CmsModelFieldToElasticsearchPlugin;
     getFieldTypePlugin(fieldType: string): CmsModelFieldToGraphQLPlugin;
 }

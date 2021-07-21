@@ -9,7 +9,8 @@ import {
 interface ProcessToIndex {
     (params: {
         fields: CmsContentModelField[];
-        value: Record<string, any>;
+        rawValue: Record<string, any>;
+        storageValue: Record<string, any>;
         getFieldIndexPlugin: (fieldType: string) => CmsModelFieldToElasticsearchPlugin;
         getFieldTypePlugin: (fieldType: string) => CmsModelFieldToGraphQLPlugin;
         context: CmsContext;
@@ -31,7 +32,8 @@ interface ProcessFromIndex {
 
 const processToIndex: ProcessToIndex = ({
     fields,
-    value: sourceValue,
+    rawValue: sourceRawValue,
+    storageValue: sourceStorageValue,
     getFieldIndexPlugin,
     getFieldTypePlugin,
     context,
@@ -43,7 +45,8 @@ const processToIndex: ProcessToIndex = ({
             context,
             model,
             field,
-            value: sourceValue[field.fieldId],
+            rawValue: sourceRawValue[field.fieldId],
+            storageValue: sourceStorageValue[field.fieldId],
             getFieldIndexPlugin,
             getFieldTypePlugin
         });
@@ -96,8 +99,16 @@ export default (): CmsModelFieldToElasticsearchPlugin => ({
     type: "cms-model-field-to-elastic-search",
     name: "cms-model-field-to-elastic-search-object",
     fieldType: "object",
-    toIndex({ context, model, field, value, getFieldIndexPlugin, getFieldTypePlugin }) {
-        if (!value) {
+    toIndex({
+        context,
+        model,
+        field,
+        rawValue: sourceRawValue,
+        storageValue: sourceStorageValue,
+        getFieldIndexPlugin,
+        getFieldTypePlugin
+    }) {
+        if (!sourceStorageValue) {
             return { value: null };
         }
 
@@ -107,10 +118,11 @@ export default (): CmsModelFieldToElasticsearchPlugin => ({
          * In "object" field, value is either an object or an array of objects.
          */
         if (field.multipleValues) {
-            const values = value.reduce(
-                (acc, item) => {
+            const values = sourceStorageValue.reduce(
+                (acc, item, index) => {
                     const { value, rawValue } = processToIndex({
-                        value: item,
+                        rawValue: sourceRawValue[index],
+                        storageValue: item,
                         getFieldIndexPlugin,
                         getFieldTypePlugin,
                         model,
@@ -137,7 +149,8 @@ export default (): CmsModelFieldToElasticsearchPlugin => ({
         }
 
         return processToIndex({
-            value,
+            rawValue: sourceRawValue,
+            storageValue: sourceStorageValue,
             getFieldIndexPlugin,
             getFieldTypePlugin,
             model,

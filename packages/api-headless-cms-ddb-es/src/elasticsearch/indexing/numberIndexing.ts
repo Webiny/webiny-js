@@ -21,9 +21,9 @@ export default (): CmsModelFieldToElasticsearchPlugin => ({
     unmappedType: () => {
         return "float";
     },
-    toIndex({ value }) {
+    toIndex({ storageValue }) {
         return {
-            value: convertToString(value)
+            value: convertToString(storageValue)
         };
     },
     fromIndex({ value }) {

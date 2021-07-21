@@ -18,12 +18,18 @@ export const systemFields: Record<string, CmsContentModelField> = {
     createdOn: createSystemField({
         id: "createdOn",
         type: "datetime",
-        fieldId: "createdOn"
+        fieldId: "createdOn",
+        settings: {
+            type: "datetime"
+        }
     }),
     savedOn: createSystemField({
         id: "savedOn",
         type: "datetime",
-        fieldId: "savedOn"
+        fieldId: "savedOn",
+        settings: {
+            type: "datetime"
+        }
     }),
     createdBy: createSystemField({
         id: "createdBy",

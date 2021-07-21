@@ -3,7 +3,8 @@ import {
     CmsContentEntryListWhere,
     CmsContentModel,
     CmsContentModelField,
-    CmsContext
+    CmsContext,
+    CmsModelFieldToStoragePlugin
 } from "@webiny/api-headless-cms/types";
 import { Plugin } from "@webiny/plugins/types";
 import WebinyError from "@webiny/error";
@@ -12,6 +13,7 @@ import dotProp from "dot-prop";
 import { CmsFieldFilterPathPlugin, CmsFieldFilterValueTransformPlugin } from "~/types";
 import { systemFields } from "./systemFields";
 import { ValueFilterPlugin } from "@webiny/db-dynamodb/plugins/definitions/ValueFilterPlugin";
+import { getStoragePluginFactory } from "@webiny/api-headless-cms/content/plugins/utils/entryStorage";
 
 interface ModelField {
     def: CmsContentModelField;
@@ -29,18 +31,21 @@ interface CreateFiltersArgs {
 }
 
 interface ItemFilter {
+    field: CmsContentModelField;
     fieldId: string;
     path: string;
     filterPlugin: ValueFilterPlugin;
     negate: boolean;
     compareValue: any;
     transformValue: <I = any, O = any>(value: I) => O;
+    storageTransformPlugin?: CmsModelFieldToStoragePlugin;
 }
 
 interface FilterItemsArgs {
     items: CmsContentEntry[];
     where: CmsContentEntryListWhere;
     context: CmsContext;
+    model: CmsContentModel;
     fields: ModelFieldRecords;
 }
 
@@ -89,6 +94,14 @@ const createFilters = (args: CreateFiltersArgs): ItemFilter[] => {
         type: "cms-field-filter-path",
         property: "fieldType"
     });
+    /**
+     * Sometimes we will need to transform the value with the storage transformer plugin.
+     */
+    const fieldStoragePlugins = getMappedPlugins<CmsModelFieldToStoragePlugin>({
+        context,
+        type: "cms-model-field-to-storage",
+        property: "fieldType"
+    });
     return Object.keys(where).map(key => {
         const { fieldId, operation, negate } = extractWhereArgs(key);
 
@@ -107,6 +120,10 @@ const createFilters = (args: CreateFiltersArgs): ItemFilter[] => {
             transformValuePlugins[field.def.type];
         const valuePathPlugin = valuePathPlugins[field.def.type];
         let targetValuePath: string;
+        /**
+         * A plugin that will transform the value from the storage, if required.
+         */
+        const storageTransformPlugin = fieldStoragePlugins[field.def.type];
         /**
          * add the base path if field is not a system field
          * pathPlugin should not know about that
@@ -146,37 +163,71 @@ const createFilters = (args: CreateFiltersArgs): ItemFilter[] => {
         };
 
         return {
+            field: field.def,
             fieldId,
             path: valuePath,
             filterPlugin,
             negate,
             compareValue: transformValue(where[key], transformValueCallable),
-            transformValue: transformValueCallable
+            transformValue: transformValueCallable,
+            storageTransformPlugin: storageTransformPlugin
         };
     });
 };
 
-export const filterItems = (args: FilterItemsArgs): CmsContentEntry[] => {
-    const { items, where, context, fields } = args;
+export const filterItems = async (args: FilterItemsArgs): Promise<CmsContentEntry[]> => {
+    const { items, where, model, context, fields } = args;
+
+    const getStoragePlugin = getStoragePluginFactory(context);
 
     const filters = createFilters({
         context,
         where,
         fields
     });
-    return items.filter(item => {
-        for (const filter of filters) {
-            const value = transformValue(dotProp.get(item, filter.path), filter.transformValue);
+
+    const filteredItems: CmsContentEntry[] = [];
+    for (const item of items) {
+        let passing = true;
+        filterLoop: for (const filter of filters) {
+            let value = transformValue(dotProp.get(item, filter.path), filter.transformValue);
+            /**
+             * If there is a storage transform plugin for the given field, we need to apply it.
+             */
+            if (filter.storageTransformPlugin) {
+                try {
+                    value = await filter.storageTransformPlugin.fromStorage({
+                        context,
+                        model,
+                        field: filter.field,
+                        value,
+                        getStoragePlugin
+                    });
+                } catch (ex) {
+                    throw new WebinyError(
+                        ex.message || "Could not transform field value from storage.",
+                        ex.code || "FIELD_VALUE_FROM_STORAGE_ERROR",
+                        {
+                            field: filter.field
+                        }
+                    );
+                }
+            }
             const matched = filter.filterPlugin.matches({
                 value,
                 compareValue: filter.compareValue
             });
             if ((filter.negate ? !matched : matched) === false) {
-                return false;
+                passing = false;
+                break filterLoop;
             }
         }
-        return true;
-    });
+        if (!passing) {
+            continue;
+        }
+        filteredItems.push(item);
+    }
+    return filteredItems;
 };
 
 const extractSort = (

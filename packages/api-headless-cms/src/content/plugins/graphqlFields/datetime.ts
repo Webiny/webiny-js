@@ -8,7 +8,7 @@ const fieldGraphQLTypes = {
 };
 
 const getFieldGraphQLType = (field: CmsContentModelField): string => {
-    const type = field.settings.type;
+    const { type } = field.settings || {};
     if (!type || !fieldGraphQLTypes[type]) {
         return "DateTime";
     }

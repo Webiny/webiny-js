@@ -366,10 +366,11 @@ export class CmsContentEntryDynamo implements CmsContentEntryStorageOperations {
          * Filter the read items via the code.
          * It will build the filters out of the where input and transform the values it is using.
          */
-        const filteredItems = filterItems({
+        const filteredItems = await filterItems({
             items,
             where: queryOptions.where,
             context: this.context,
+            model,
             fields: modelFields
         });
 

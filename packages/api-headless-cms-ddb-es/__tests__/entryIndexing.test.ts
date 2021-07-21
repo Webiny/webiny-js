@@ -137,6 +137,7 @@ const plugins = new PluginsContainer([...indexingPlugins(), ...cmsFieldTypePlugi
 describe("entryIndexing", () => {
     test("should prepare entry for indexing", () => {
         const entryToIndex = prepareEntryToIndex({
+            originalEntry: mockInputEntry as any,
             storageEntry: mockInputEntry as any,
             model: mockModel,
             context: { plugins } as any
