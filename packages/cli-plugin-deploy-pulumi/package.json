@@ -30,6 +30,7 @@
     "node-notifier": "7.0.2",
     "open": "^8.0.6",
     "ora": "4.1.1",
+    "random-color": "^1.0.1",
     "rimraf": "^3.0.2",
     "tree-kill": "^1.2.2",
     "ws": "^7.4.5"

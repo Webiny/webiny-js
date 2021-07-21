@@ -3,7 +3,7 @@ const chalk = require("chalk");
 const localtunnel = require("localtunnel");
 const express = require("express");
 const bodyParser = require("body-parser");
-const { login, getPulumi, loadEnvVariables, getRandomColorForString } = require("../utils");
+const { login, getPulumi, loadEnvVariables, getRandomColor } = require("../utils");
 const { getProjectApplication } = require("@webiny/cli/utils");
 const path = require("path");
 const get = require("lodash/get");
@@ -308,15 +308,36 @@ module.exports = async (inputs, context) => {
     }
 };
 
+let lastRequestId;
+let lastTimestamp;
+let color;
+
 const printLog = ({ pattern = "*", consoleLog, output }) => {
-    const plainPrefix = `${consoleLog.meta.functionName}:`;
-    let message = consoleLog.args.join(" ").trim();
+    const { functionName, timestamp, requestId } = consoleLog.meta;
+    if (lastRequestId !== requestId) {
+        lastTimestamp = undefined;
+        lastRequestId = requestId;
+        // Generate a color for all logs in this request
+        color = chalk.hex(getRandomColor());
+        output.log({
+            type: "logs",
+            message: `---------- Request ID: ${color(requestId)} ----------`
+        });
+    }
+    const time = new Date(timestamp).toISOString().split("T")[1];
+    const message = consoleLog.args.join(" ").trim();
+    let diff = "";
+    if (lastTimestamp) {
+        diff = `+${timestamp - lastTimestamp}ms`;
+    }
+
+    lastTimestamp = timestamp;
+
     if (message) {
-        if (minimatch(plainPrefix, pattern)) {
-            const coloredPrefix = chalk.hex(getRandomColorForString(plainPrefix)).bold(plainPrefix);
+        if (minimatch(functionName, pattern)) {
             output.log({
                 type: "logs",
-                message: coloredPrefix + message
+                message: `${time} ${color.bold(functionName)}: ${message} ${color(diff)}`
             });
         }
     }

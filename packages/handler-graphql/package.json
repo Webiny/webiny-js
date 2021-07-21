@@ -23,7 +23,8 @@
     "boolean": "^3.0.1",
     "graphql": "^14.4.2",
     "graphql-scalars": "^1.7.0",
-    "graphql-tag": "^2.10.3"
+    "graphql-tag": "^2.10.3",
+    "nanoid": "^3.1.20"
   },
   "devDependencies": {
     "@babel/cli": "^7.5.5",
