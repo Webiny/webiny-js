@@ -43,6 +43,7 @@ module.exports = async projectApplication => {
         const selfManagedBackend = SELF_MANAGED_BACKEND.find(item => login.startsWith(item));
         if (selfManagedBackend) {
             login = trimEnd(login, "/") + "/" + relativeProjectApplicationPath;
+            login = login.replace(/\\/g, "/");
         }
     } else {
         // By default, we use local file system as backend. All files are stored in project root's

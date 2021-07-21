@@ -122,15 +122,24 @@ class FileManager {
             }
         );
 
-        this.bucketNotification = new aws.s3.BucketNotification("bucketNotification", {
-            bucket: this.bucket.id,
-            lambdaFunctions: [
-                {
-                    lambdaFunctionArn: this.functions.manage.arn,
-                    events: ["s3:ObjectRemoved:*"]
-                }
-            ]
-        });
+        this.bucketNotification = new aws.s3.BucketNotification(
+            "bucketNotification",
+            {
+                bucket: this.bucket.id,
+                lambdaFunctions: [
+                    {
+                        lambdaFunctionArn: this.functions.manage.arn,
+                        events: ["s3:ObjectRemoved:*"]
+                    }
+                ]
+            },
+            {
+                dependsOn: [
+                    this.bucket,
+                    this.functions.manage
+                ]
+            }
+        );
     }
 }
 
