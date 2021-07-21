@@ -43,8 +43,8 @@ const footer = css({
 });
 
 export const SimpleForm = (props: {
-    "data-testid"?: string;
     children: React.ReactNode;
+    "data-testid"?: string;
     noElevation?: boolean;
     className?: string;
 }) => {

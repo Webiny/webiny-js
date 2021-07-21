@@ -1,8 +1,5 @@
-import React, { useCallback } from "react";
-import pick from "lodash/pick";
-import isEmpty from "lodash/isEmpty";
+import React, { Fragment } from "react";
 import styled from "@emotion/styled";
-import { i18n } from "@webiny/app/i18n";
 import { Form } from "@webiny/form";
 import { Input } from "@webiny/ui/Input";
 import { Grid, Cell } from "@webiny/ui/Grid";
@@ -16,19 +13,13 @@ import {
     SimpleFormFooter,
     SimpleFormContent
 } from "@webiny/app-admin/components/SimpleForm";
+import EmptyView from "@webiny/app-admin/components/EmptyView";
+import { ReactComponent as AddIcon } from "@webiny/app-admin/assets/icons/add-18px.svg";
 import GroupAutocomplete from "../Components/GroupAutocomplete";
 import AvatarImage from "./../Components/AvatarImage";
 import { ReactComponent as SettingsIcon } from "../../assets/icons/settings-24px.svg";
 import { ReactComponent as SecurityIcon } from "../../assets/icons/security-24px.svg";
-import { CREATE_USER, READ_USER, LIST_USERS, UPDATE_USER } from "./graphql";
-import { useRouter } from "@webiny/react-router";
-import { useSnackbar } from "@webiny/app-admin/hooks/useSnackbar";
-import { useMutation, useQuery } from "@apollo/react-hooks";
-import EmptyView from "@webiny/app-admin/components/EmptyView";
-import { ReactComponent as AddIcon } from "@webiny/app-admin/assets/icons/add-18px.svg";
-import { View } from "@webiny/app/components/View";
-
-const t = i18n.ns("app-security-admin-users/admin/users-form");
+import { useUserForm } from "~/views/Users/hooks/useUserForm";
 
 const AvatarWrapper = styled("div")({
     margin: "24px 100px 32px"
@@ -43,95 +34,25 @@ const ButtonWrapper = styled("div")({
     justifyContent: "space-between"
 });
 
-const pickDataForCreateOperation = data =>
-    pick(data, ["login", "password", "firstName", "lastName", "avatar", "group"]);
-
-const pickDataForUpdateOperation = data =>
-    pick(data, ["password", "firstName", "lastName", "avatar", "group"]);
-
 const UsersForm = () => {
-    const { location, history } = useRouter();
-    const { showSnackbar } = useSnackbar();
-    const newUser = new URLSearchParams(location.search).get("new") === "true";
-    const login = new URLSearchParams(location.search).get("login");
+    const {
+        login,
+        fullName,
+        showEmptyView,
+        createUser,
+        cancelEditing,
+        user,
+        loading,
+        onSubmit
+    } = useUserForm();
 
-    const { data, loading: userLoading } = useQuery(READ_USER, {
-        variables: { login },
-        skip: !login,
-        onCompleted: data => {
-            if (!data) {
-                return;
-            }
-
-            const { error } = data.security.user;
-            if (error) {
-                history.push("/security/users");
-                showSnackbar(error.message);
-            }
-        }
-    });
-
-    const [create, { loading: createLoading }] = useMutation(CREATE_USER, {
-        refetchQueries: [{ query: LIST_USERS }]
-    });
-
-    const [update, { loading: updateLoading }] = useMutation(UPDATE_USER, {
-        refetchQueries: [{ query: LIST_USERS }]
-    });
-
-    const loading = userLoading || createLoading || updateLoading;
-
-    const onSubmit = useCallback(
-        async data => {
-            const isUpdate = data.createdOn;
-            const [operation, args] = isUpdate
-                ? [
-                      update,
-                      {
-                          variables: {
-                              login: data.login,
-                              data: pickDataForUpdateOperation(data)
-                          }
-                      }
-                  ]
-                : [
-                      create,
-                      {
-                          variables: {
-                              data: pickDataForCreateOperation(data)
-                          }
-                      }
-                  ];
-
-            const result = await operation(args);
-
-            const { data: user, error } = result.data.security.user;
-
-            if (error) {
-                return showSnackbar(error.message);
-            }
-
-            !isUpdate && history.push(`/security/users?login=${encodeURIComponent(user.login)}`);
-            showSnackbar(t`User saved successfully.`);
-        },
-        [login]
-    );
-
-    const user = userLoading ? {} : data ? data.security.user.data : {};
-
-    const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
-
-    const showEmptyView = !newUser && !userLoading && isEmpty(user);
     if (showEmptyView) {
         return (
             <EmptyView
-                title={t`Click on the left side list to display user details or create a...`}
+                title={"Click on the left side list to display user details or create a..."}
                 action={
-                    <ButtonDefault
-                        data-testid="new-record-button"
-                        onClick={() => history.push("/security/users?new=true")}
-                    >
-                        <ButtonIcon icon={<AddIcon />} /> {t`New User`}
+                    <ButtonDefault data-testid="new-record-button" onClick={createUser}>
+                        <ButtonIcon icon={<AddIcon />} /> {"New User"}
                     </ButtonDefault>
                 }
             />
@@ -140,8 +61,8 @@ const UsersForm = () => {
 
     return (
         <Form data={user} onSubmit={onSubmit}>
-            {({ data, form, Bind, submit }) => (
-                <View name={"adminUsers.user.form"} props={{ data, form, Bind, submit }}>
+            {({ data, form, Bind }) => (
+                <Fragment>
                     <AvatarWrapper>
                         <Bind name="avatar">
                             <AvatarImage round />
@@ -150,7 +71,7 @@ const UsersForm = () => {
                     <FormWrapper>
                         <SimpleForm>
                             {loading && <CircularProgress />}
-                            <SimpleFormHeader title={fullName || t`New User`} />
+                            <SimpleFormHeader title={fullName || "New User"} />
                             <SimpleFormContent>
                                 <Accordion elevation={0}>
                                     <AccordionItem
@@ -165,7 +86,7 @@ const UsersForm = () => {
                                                     name="firstName"
                                                     validators={validation.create("required")}
                                                 >
-                                                    <Input label={t`First Name`} />
+                                                    <Input label={"First Name"} />
                                                 </Bind>
                                             </Cell>
                                             <Cell span={12}>
@@ -173,7 +94,7 @@ const UsersForm = () => {
                                                     name="lastName"
                                                     validators={validation.create("required")}
                                                 >
-                                                    <Input label={t`Last Name`} />
+                                                    <Input label={"Last name"} />
                                                 </Bind>
                                             </Cell>
                                             <Cell span={12}>
@@ -185,15 +106,11 @@ const UsersForm = () => {
                                                     validators={validation.create("required,email")}
                                                 >
                                                     <Input
-                                                        label={t`Email`}
+                                                        label={"Email"}
                                                         disabled={Boolean(login)}
                                                     />
                                                 </Bind>
                                             </Cell>
-                                            <View
-                                                name={"adminUsers.user.form.fields"}
-                                                props={{ Bind, data }}
-                                            />
                                         </Grid>
                                     </AccordionItem>
                                     <AccordionItem
@@ -207,7 +124,7 @@ const UsersForm = () => {
                                                 name="group"
                                                 validators={validation.create("required")}
                                             >
-                                                <GroupAutocomplete label={t`Group`} />
+                                                <GroupAutocomplete label={"Group"} />
                                             </Bind>
                                         </Cell>
                                     </AccordionItem>
@@ -215,17 +132,17 @@ const UsersForm = () => {
                             </SimpleFormContent>
                             <SimpleFormFooter>
                                 <ButtonWrapper>
-                                    <ButtonDefault
-                                        onClick={() => history.push("/security/users")}
-                                    >{t`Cancel`}</ButtonDefault>
-                                    <ButtonPrimary
-                                        onClick={form.submit}
-                                    >{t`Save user`}</ButtonPrimary>
+                                    <ButtonDefault onClick={cancelEditing}>
+                                        {"Cancel"}
+                                    </ButtonDefault>
+                                    <ButtonPrimary onClick={form.submit}>
+                                        {"Save user"}
+                                    </ButtonPrimary>
                                 </ButtonWrapper>
                             </SimpleFormFooter>
                         </SimpleForm>
                     </FormWrapper>
-                </View>
+                </Fragment>
             )}
         </Form>
     );

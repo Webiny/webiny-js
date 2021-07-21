@@ -58,9 +58,7 @@ const UsersDataList = () => {
     const { identity } = useSecurity();
     const { history } = useRouter();
     const { showSnackbar } = useSnackbar();
-    const { showConfirmation } = useConfirmationDialog({
-        dataTestId: "default-data-list.delete-dialog"
-    });
+    const { showConfirmation } = useConfirmationDialog();
 
     const filterUsers = useCallback(
         ({ login, firstName, lastName }) => {
@@ -157,15 +155,10 @@ const UsersDataList = () => {
                 <SearchUI value={filter} onChange={setFilter} inputPlaceholder={t`Search users`} />
             }
             modalOverlay={usersDataListModalOverlay}
-            modalOverlayAction={
-                <DataListModalOverlayAction
-                    icon={<FilterIcon />}
-                    data-testid={"default-data-list.filter"}
-                />
-            }
+            modalOverlayAction={<DataListModalOverlayAction icon={<FilterIcon />} />}
         >
             {({ data }) => (
-                <ScrollList twoLine avatarList data-testid="default-data-list">
+                <ScrollList twoLine avatarList>
                     {data.map(item => (
                         <ListItem key={item.login} selected={item.login === login}>
                             <ListItemGraphic>
@@ -191,11 +184,8 @@ const UsersDataList = () => {
 
                             <ListItemMeta>
                                 <ListActions>
-                                    {identity && identity.login !== item.login ? (
-                                        <DeleteIcon
-                                            onClick={() => deleteItem(item)}
-                                            data-testid={"default-data-list.delete"}
-                                        />
+                                    {identity && identity.id !== item.login ? (
+                                        <DeleteIcon onClick={() => deleteItem(item)} />
                                     ) : (
                                         <Tooltip
                                             placement={"bottom"}

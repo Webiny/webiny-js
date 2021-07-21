@@ -11,6 +11,7 @@
     "../app-security",
     "../form",
     "../react-router",
+    "../ui-composer",
     "../ui",
     "../validation",
     "../plugins"

@@ -1,0 +1,34 @@
+{
+  "name": "@webiny/ui-composer",
+  "version": "5.10.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/webiny/webiny-js.git"
+  },
+  "description": "A set of classes to compose UI using elements.",
+  "author": "Webiny Ltd.",
+  "license": "MIT",
+  "dependencies": {
+    "@babel/runtime": "^7.5.5",
+    "@webiny/plugins": "^5.10.0",
+    "react": "^16.14.0",
+    "react-dom": "^16.14.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.5.5",
+    "@babel/core": "^7.5.5",
+    "@babel/preset-env": "^7.5.5",
+    "@webiny/cli": "^5.10.0",
+    "@webiny/project-utils": "^5.10.0",
+    "rimraf": "^3.0.2",
+    "typescript": "^4.1.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "directory": "dist"
+  },
+  "scripts": {
+    "build": "yarn webiny run build",
+    "watch": "yarn webiny run watch"
+  }
+}
