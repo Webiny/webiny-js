@@ -8907,6 +8907,27 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@webiny/api-security-admin-users-so-ddb@workspace:packages/api-security-admin-users-so-ddb":
+  version: 0.0.0-use.local
+  resolution: "@webiny/api-security-admin-users-so-ddb@workspace:packages/api-security-admin-users-so-ddb"
+  dependencies:
+    "@babel/cli": ^7.5.5
+    "@babel/core": ^7.5.5
+    "@webiny/api-security-admin-users": ^5.10.0
+    "@webiny/api-tenancy": ^5.10.0
+    "@webiny/cli": ^5.10.0
+    "@webiny/db-dynamodb": ^5.10.0
+    "@webiny/error": ^5.10.0
+    "@webiny/project-utils": ^5.10.0
+    dynamodb-toolbox: ^0.3.4
+    jest: ^26.6.3
+    jest-dynalite: ^3.2.0
+    rimraf: ^3.0.2
+    ttypescript: ^1.5.12
+    typescript: ^4.1.3
+  languageName: unknown
+  linkType: soft
+
 "@webiny/api-security-admin-users@^5.10.0, @webiny/api-security-admin-users@workspace:packages/api-security-admin-users":
   version: 0.0.0-use.local
   resolution: "@webiny/api-security-admin-users@workspace:packages/api-security-admin-users"
@@ -10014,6 +10035,7 @@ __metadata:
     is-number: ^7.0.0
     jest: ^26.6.3
     jest-dynalite: ^3.2.0
+    lodash.chunk: ^4.2.0
     lodash.sortby: ^4.7.0
     rimraf: ^3.0.2
     ttypescript: ^1.5.12

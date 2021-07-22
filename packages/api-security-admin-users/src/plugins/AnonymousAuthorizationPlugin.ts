@@ -22,7 +22,7 @@ export class AnonymousAuthorizationPlugin extends AuthorizationPlugin<AdminUsers
         // We assume that all other authorization plugins have already been executed.
         // If we've reached this far, it means that we have an anonymous user
         // and we need to load permissions from the "anonymous" group.
-        const group = await security.groups.getGroup(tenant, "anonymous");
+        const group = await security.groups.getGroup("anonymous");
 
         const permissions = group ? group.permissions || [] : [];
         this._permissionCache.set(tenant.id, permissions);

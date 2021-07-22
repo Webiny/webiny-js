@@ -6,15 +6,8 @@
     "dist",
     "../db-dynamodb",
     "../error",
-    "../handler",
-    "../handler-http",
-    "../handler-db",
-    "../api-security",
-    "../api-tenancy",
-    "../plugins",
-    "../validation",
-    "../handler-aws",
-    "../handler-graphql"
+    "../api-security-admin-users",
+    "../api-tenancy"
   ],
   "compilerOptions": {
     "rootDir": "./src",

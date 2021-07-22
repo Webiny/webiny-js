@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { Response, ErrorResponse, NotFoundResponse } from "@webiny/handler-graphql/responses";
-import { AdminUsersContext, User } from "../types";
+import { AdminUsersContext, User } from "~/types";
 import { GraphQLSchemaPlugin } from "@webiny/handler-graphql/plugins/GraphQLSchemaPlugin";
 
 const generateToken = (tokenLength = 48) => {
@@ -85,7 +85,7 @@ export default new GraphQLSchemaPlugin<AdminUsersContext>({
 
                 try {
                     const token = generateToken();
-                    const tokenData = await context.security.users.createToken(identity.id, {
+                    const tokenData = await context.security.users.createToken(identity, {
                         ...data,
                         token
                     });

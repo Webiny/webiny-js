@@ -8,8 +8,12 @@ export interface QueryAllParams {
     options?: DynamoDBToolboxQueryOptions;
 }
 
+export interface QueryOneParams extends QueryAllParams {
+    options?: Omit<DynamoDBToolboxQueryOptions, "limit">;
+}
+
 export interface QueryParams extends QueryAllParams {
-    previous: any;
+    previous?: any;
 }
 
 export interface QueryResult<T> {
@@ -22,7 +26,7 @@ export interface QueryResult<T> {
  * It returns the result and the items it found.
  * Result is required to fetch the items that were not fetched in the previous run.
  */
-export const query = async <T>(params: QueryParams): Promise<QueryResult<T>> => {
+const query = async <T>(params: QueryParams): Promise<QueryResult<T>> => {
     const { entity, previous, partitionKey, options } = params;
     let result;
     /**
@@ -37,12 +41,6 @@ export const query = async <T>(params: QueryParams): Promise<QueryResult<T>> => 
          * In case result of the next method is false, it means it has nothing else to read
          * and we return a null to keep the query from repeating.
          */
-        if (typeof previous.next !== "function") {
-            return {
-                result: null,
-                items: []
-            };
-        }
         result = await previous.next();
         if (result === false) {
             return {
@@ -53,7 +51,7 @@ export const query = async <T>(params: QueryParams): Promise<QueryResult<T>> => 
     } else {
         /**
          * This could probably never happen but keep it here just in case to break the query loop.
-         * Basically, either previous does not exist or it exists and has a next method
+         * Basically, either previous does not exist or it exists and it does not have the next method
          * and at that point a result returned will be null and loop should not start again.
          */
         return {
@@ -78,6 +76,19 @@ export const query = async <T>(params: QueryParams): Promise<QueryResult<T>> => 
         result,
         items: result.Items
     };
+};
+/**
+ * Will run the query to fetch the first possible item from the database.
+ */
+export const queryOne = async <T>(params: QueryOneParams): Promise<T | null> => {
+    const { items } = await query<T>({
+        ...params,
+        options: {
+            ...(params.options || {}),
+            limit: 1
+        }
+    });
+    return items[0] || null;
 };
 /**
  * Will run the query to fetch the results no matter how much iterations it needs to go through.

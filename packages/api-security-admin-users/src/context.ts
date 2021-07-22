@@ -1,16 +1,20 @@
 import { ContextPlugin } from "@webiny/handler/plugins/ContextPlugin";
 import { Tenant } from "@webiny/api-tenancy/types";
-import { Users } from "./crud/users.crud";
+import usersCrud from "./crud/users.crud";
 import groupCrud from "./crud/groups.crud";
 import apiKeyCrud from "./crud/apiKey.crud";
 import systemCrud from "./crud/system.crud";
-import { AdminUsersContext } from "./types";
+import { AdminUsers, AdminUsersContext } from "./types";
+import { SecurityContextBase } from "@webiny/api-security/types";
 
 export default () => {
-    return new ContextPlugin<AdminUsersContext>(async context => {
+    /**
+     * We need the base context to initialize the security variable on the context
+     * and to add deprecation warnings on old methods.
+     */
+    const baseContext = new ContextPlugin<AdminUsersContext>(async context => {
         if (!context.security) {
-            // @ts-ignore
-            context.security = {};
+            context.security = {} as AdminUsers & SecurityContextBase;
         }
 
         // @ts-ignore
@@ -28,10 +32,7 @@ export default () => {
             );
             context.tenancy.setCurrentTenant(tenant);
         };
-
-        context.security.users = new Users(context);
-        context.security.groups = groupCrud(context);
-        context.security.apiKeys = apiKeyCrud(context);
-        context.security.system = systemCrud(context);
     });
+
+    return [baseContext, apiKeyCrud, groupCrud, systemCrud, usersCrud];
 };

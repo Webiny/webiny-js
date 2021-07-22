@@ -1,0 +1,4 @@
+{
+  "name": "API Security Admin Users DynamoDB",
+  "entryPoints": ["types.ts"]
+}

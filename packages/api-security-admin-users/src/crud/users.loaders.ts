@@ -3,14 +3,20 @@ import omit from "lodash.omit";
 import WebinyError from "@webiny/error";
 import { Tenant } from "@webiny/api-tenancy/types";
 import dbArgs from "./dbArgs";
-import { AdminUsersContext, TenantAccess, User } from "../types";
+import { AdminUsersContext, TenantAccess, User, UserStorageOperations } from "~/types";
 
+interface Params {
+    context: AdminUsersContext;
+    storageOperations: UserStorageOperations;
+}
 export class UserLoaders {
-    private loaders = new Map<string, DataLoader<any, any>>();
-    private context: AdminUsersContext;
+    private readonly loaders = new Map<string, DataLoader<any, any>>();
+    private readonly context: AdminUsersContext;
+    private readonly storageOperations: UserStorageOperations;
 
-    constructor(context: AdminUsersContext) {
-        this.context = context;
+    constructor(params: Params) {
+        this.context = params.context;
+        this.storageOperations = params.storageOperations;
     }
 
     get getUser() {

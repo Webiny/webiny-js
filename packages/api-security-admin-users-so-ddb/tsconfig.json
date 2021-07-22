@@ -1,0 +1,32 @@
+{
+  "extends": "../../tsconfig",
+  "include": ["./src", "./__tests__"],
+  "references": [
+    {
+      "path": "../api-security-admin-users"
+    },
+    {
+      "path": "../api-tenancy"
+    },
+    {
+      "path": "../db-dynamodb"
+    },
+    {
+      "path": "../error"
+    }
+  ],
+  "compilerOptions": {
+    "paths": {
+      "~/*": ["./src/*"],
+      "@webiny/api-security-admin-users/*": ["../api-security-admin-users/src/*"],
+      "@webiny/api-security-admin-users": ["../api-security-admin-users/src"],
+      "@webiny/api-tenancy/*": ["../api-tenancy/src/*"],
+      "@webiny/api-tenancy": ["../api-tenancy/src"],
+      "@webiny/db-dynamodb/*": ["../db-dynamodb/src/*"],
+      "@webiny/db-dynamodb": ["../db-dynamodb/src"],
+      "@webiny/error/*": ["../error/src/*"],
+      "@webiny/error": ["../error/src"]
+    },
+    "baseUrl": "."
+  }
+}

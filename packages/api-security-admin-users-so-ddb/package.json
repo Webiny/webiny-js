@@ -1,5 +1,5 @@
 {
-  "name": "@webiny/api-security-admin-users",
+  "name": "@webiny/api-security-admin-users-so-ddb",
   "version": "5.10.0",
   "main": "index.js",
   "repository": {
@@ -7,31 +7,20 @@
     "url": "https://github.com/webiny/webiny-js.git"
   },
   "keywords": [
-    "sau:base"
+    "@webiny/api-security-admin-users",
+    "storage-operations",
+    "dynamodb",
+    "sau:ddb"
   ],
-  "description": "Admin user management (users, groups, API keys).",
+  "description": "Admin user management storage operations.",
   "author": "Webiny Ltd.",
   "license": "MIT",
   "dependencies": {
-    "@commodo/fields": "1.1.2-beta.20",
-    "@webiny/api-security": "^5.10.0",
+    "@webiny/api-security-admin-users": "^5.10.0",
     "@webiny/api-tenancy": "^5.10.0",
     "@webiny/db-dynamodb": "^5.10.0",
     "@webiny/error": "^5.10.0",
-    "@webiny/handler": "^5.10.0",
-    "@webiny/handler-aws": "^5.10.0",
-    "@webiny/handler-db": "^5.10.0",
-    "@webiny/handler-graphql": "^5.10.0",
-    "@webiny/handler-http": "^5.10.0",
-    "@webiny/plugins": "^5.10.0",
-    "@webiny/validation": "^5.10.0",
-    "commodo-fields-object": "^1.0.6",
-    "dataloader": "^2.0.0",
-    "deep-equal": "^2.0.4",
-    "lodash.clonedeep": "^4.5.0",
-    "lodash.omit": "^4.5.0",
-    "md5": "^2.3.0",
-    "mdbid": "^1.0.0"
+    "dynamodb-toolbox": "^0.3.4"
   },
   "devDependencies": {
     "@babel/cli": "^7.5.5",

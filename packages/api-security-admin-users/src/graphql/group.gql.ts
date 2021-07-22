@@ -1,13 +1,10 @@
-import deepEqual from "deep-equal";
 import {
     ErrorResponse,
     ListErrorResponse,
     ListResponse,
-    NotFoundResponse,
     Response
 } from "@webiny/handler-graphql/responses";
-import NotAuthorizedResponse from "@webiny/api-security/NotAuthorizedResponse";
-import { AdminUsersContext, GroupInput } from "../types";
+import { AdminUsersContext, GroupInput } from "~/types";
 import { GraphQLSchemaPlugin } from "@webiny/handler-graphql/plugins/GraphQLSchemaPlugin";
 
 export default new GraphQLSchemaPlugin<AdminUsersContext>({
@@ -57,37 +54,16 @@ export default new GraphQLSchemaPlugin<AdminUsersContext>({
     resolvers: {
         SecurityQuery: {
             getGroup: async (_, { slug }: { slug: string }, context) => {
-                const { security, tenancy } = context;
-                const permission = await security.getPermission("security.group");
-
-                if (!permission) {
-                    return new NotAuthorizedResponse();
-                }
-
                 try {
-                    const tenant = tenancy.getCurrentTenant();
-                    const group = await security.groups.getGroup(tenant, slug);
-
-                    if (!group) {
-                        return new NotFoundResponse(`Unable to find group with slug: ${slug}`);
-                    }
-
+                    const group = await context.security.groups.getGroup(slug);
                     return new Response(group);
                 } catch (e) {
                     return new ErrorResponse(e);
                 }
             },
             listGroups: async (_, args, context) => {
-                const { security, tenancy } = context;
-                const permission = await security.getPermission("security.group");
-
-                if (!permission) {
-                    return new NotAuthorizedResponse();
-                }
-
                 try {
-                    const tenant = tenancy.getCurrentTenant();
-                    const groupList = await security.groups.listGroups(tenant);
+                    const groupList = await context.security.groups.listGroups();
 
                     return new ListResponse(groupList);
                 } catch (e) {
@@ -97,18 +73,10 @@ export default new GraphQLSchemaPlugin<AdminUsersContext>({
         },
         SecurityMutation: {
             createGroup: async (_, { data }: { data: GroupInput }, context) => {
-                const { security, tenancy } = context;
-                const permission = await security.getPermission("security.group");
-
-                if (!permission) {
-                    return new NotAuthorizedResponse();
-                }
-
                 try {
-                    const tenant = tenancy.getCurrentTenant();
-                    const groupData = await security.groups.createGroup(tenant, data);
+                    const group = await context.security.groups.createGroup(data);
 
-                    return new Response(groupData);
+                    return new Response(group);
                 } catch (e) {
                     return new ErrorResponse(e);
                 }
@@ -118,55 +86,16 @@ export default new GraphQLSchemaPlugin<AdminUsersContext>({
                 { slug, data }: { slug: string; data: Omit<GroupInput, "slug" | "system"> },
                 context
             ) => {
-                const { security, tenancy } = context;
-                const permission = await security.getPermission("security.group");
-
-                if (!permission) {
-                    return new NotAuthorizedResponse();
-                }
-
                 try {
-                    const tenant = tenancy.getCurrentTenant();
-                    const existingGroup = await security.groups.getGroup(tenant, slug);
-
-                    if (!existingGroup) {
-                        return new NotFoundResponse(`Group "${slug}" was not found!`);
-                    }
-
-                    const permissionsChanged = !deepEqual(
-                        data.permissions,
-                        existingGroup.permissions
-                    );
-
-                    await security.groups.updateGroup(tenant, slug, data);
-                    Object.assign(existingGroup, data);
-
-                    if (permissionsChanged) {
-                        await security.groups.updateUserLinks(tenant, existingGroup);
-                    }
-
-                    return new Response(existingGroup);
+                    const group = await context.security.groups.updateGroup(slug, data);
+                    return new Response(group);
                 } catch (e) {
                     return new ErrorResponse(e);
                 }
             },
             deleteGroup: async (_, { slug }: { slug: string }, context) => {
-                const { security, tenancy } = context;
-                const permission = await security.getPermission("security.group");
-
-                if (!permission) {
-                    return new NotAuthorizedResponse();
-                }
-
                 try {
-                    const tenant = tenancy.getCurrentTenant();
-                    const group = await security.groups.getGroup(tenant, slug);
-
-                    if (!group) {
-                        return new NotFoundResponse(`Group "${slug}" was not found!`);
-                    }
-
-                    await security.groups.deleteGroup(tenant, slug);
+                    await context.security.groups.deleteGroup(slug);
 
                     return new Response(true);
                 } catch (e) {

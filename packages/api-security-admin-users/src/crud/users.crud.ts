@@ -6,35 +6,25 @@ import { Tenant } from "@webiny/api-tenancy/types";
 import { NotAuthorizedError } from "@webiny/api-security";
 import { NotFoundError } from "@webiny/handler-graphql";
 import WebinyError from "@webiny/error";
-import { Base } from "./base.crud";
-import { UserPlugin } from "../plugins/UserPlugin";
+import { UserPlugin } from "~/plugins/UserPlugin";
 import {
     AdminUsersContext,
     CreatePersonalAccessTokenInput,
     CreateUserInput,
-    DbItemSecurityUser2Tenant,
     Group,
     TenantAccess,
     UpdatePersonalAccessTokenInput,
     UpdateUserInput,
     User,
-    UserPersonalAccessToken,
-    UsersCRUD
-} from "../types";
+    UserPersonalAccessToken
+} from "~/types";
 
 import dbArgs from "./dbArgs";
 import { UserLoaders } from "./users.loaders";
 import validationPlugin from "./users.validation";
-
-type DbItem<T> = T & {
-    PK: string;
-    SK: string;
-    GSI1_PK: string;
-    GSI1_SK: string;
-};
-
-type DbUser = DbItem<User>;
-type DbUserAccessToken = DbItem<UserPersonalAccessToken>;
+import { UserStorageOperationsProvider } from "~/plugins/UserStorageOperationsProvider";
+import { ContextPlugin } from "@webiny/handler/plugins/ContextPlugin";
+import { SecurityIdentity } from "@webiny/api-security/types";
 
 const CreateAccessTokenDataModel = withFields({
     name: string({ validation: validation.create("required,maxLength:100") }),
@@ -45,429 +35,543 @@ const UpdateAccessTokenDataModel = withFields({
     name: string({ validation: validation.create("required") })
 })();
 
-export class Users extends Base implements UsersCRUD {
-    private loaders: UserLoaders;
-
-    constructor(context: AdminUsersContext) {
-        super(context);
-
-        context.plugins.register(validationPlugin);
-        this.loaders = new UserLoaders(context);
-    }
-
-    get plugins(): UserPlugin[] {
-        return this.context.plugins.byType<UserPlugin>(UserPlugin.type);
-    }
-
-    async login(): Promise<User> {
-        const { security } = this.context;
-        const identity = security.getIdentity();
-
-        if (!identity) {
-            throw new NotAuthorizedError();
+const executeCallback = async <TCallbackFunction extends (params: any) => void | Promise<void>>(
+    plugins: UserPlugin[],
+    callback: string,
+    params: Parameters<TCallbackFunction>[0]
+) => {
+    for (const plugin of plugins) {
+        if (typeof plugin[callback] === "function") {
+            await plugin[callback](params);
         }
-
-        let user = await this.getUser(identity.id, { auth: false });
-
-        let firstLogin = false;
-
-        if (!user) {
-            firstLogin = true;
-            // Create a "Security User"
-            user = await this.createUser(
-                {
-                    login: identity.id,
-                    firstName: identity.firstName || "",
-                    lastName: identity.lastName || "",
-                    avatar: identity.avatar
-                },
-                { auth: false }
-            );
-        }
-
-        await this.executeCallback<UserPlugin["onLogin"]>("onLogin", {
-            context: this.context,
-            user,
-            firstLogin
-        });
-
-        return user;
     }
+};
 
-    async createToken(
-        login: string,
-        data: CreatePersonalAccessTokenInput
-    ): Promise<UserPersonalAccessToken> {
-        const { name, token } = data;
-        await new CreateAccessTokenDataModel().populate({ name, token }).validate();
-
-        const tokenData = {
-            ...data,
-            id: mdbid(),
-            name,
-            token,
-            login,
-            createdOn: new Date().toISOString()
-        };
-
-        await this.context.db.create({
-            ...dbArgs,
-            data: {
-                PK: `U#${login}`,
-                SK: `PAT#${tokenData.id}`,
-                GSI1_PK: `PAT`,
-                GSI1_SK: token,
-                TYPE: "security.pat",
-                ...tokenData
+export default new ContextPlugin<AdminUsersContext>(async context => {
+    const providers = context.plugins.byType<UserStorageOperationsProvider>(
+        UserStorageOperationsProvider.type
+    );
+    /**
+     * Always take the last given provider - although if everything is loaded as it must, there should not be more than one.
+     * We do not check/verify for multiple providers.
+     */
+    const provider = providers.pop();
+    if (!provider) {
+        throw new WebinyError(
+            "Could not find a UserStorageOperationsProvider plugin registered.",
+            "PROVIDER_PLUGIN_ERROR",
+            {
+                type: UserStorageOperationsProvider.type
             }
-        });
-
-        return tokenData;
+        );
     }
 
-    async createUser(data: CreateUserInput, options: { auth?: boolean } = {}): Promise<User> {
-        const { db, security, tenancy } = this.context;
+    const storageOperations = await provider.provide({
+        context
+    });
 
-        const auth = "auth" in options ? options.auth : true;
+    const userPlugins = context.plugins.byType<UserPlugin>(UserPlugin.type);
+    /**
+     * Validation plugin for creating/updating the user.
+     */
+    context.plugins.register(validationPlugin);
+    /**
+     * We need the data loaders to cache what ever we can.
+     */
+    const loaders = new UserLoaders({ context, storageOperations });
 
-        if (auth) {
-            const permission = await security.getPermission("security.user");
-            if (!permission) {
+    context.security.users = {
+        async login(): Promise<User> {
+            const { security } = context;
+            const identity = security.getIdentity();
+
+            if (!identity) {
                 throw new NotAuthorizedError();
             }
-        }
 
-        const login = data.login.toLowerCase();
-        const identity = security.getIdentity();
+            let user = await context.security.users.getUser(identity.id, { auth: false });
 
-        if (await this.getUser(login, { auth: false })) {
-            throw {
-                message: "User with that login already exists.",
-                code: "USER_EXISTS"
+            let firstLogin = false;
+
+            if (!user) {
+                firstLogin = true;
+                // Create a "Security User"
+                user = await context.security.users.createUser(
+                    {
+                        login: identity.id,
+                        firstName: identity.firstName || "",
+                        lastName: identity.lastName || "",
+                        avatar: identity.avatar
+                    },
+                    { auth: false }
+                );
+            }
+
+            await executeCallback<UserPlugin["onLogin"]>(userPlugins, "onLogin", {
+                context,
+                user,
+                firstLogin
+            });
+
+            return user;
+        },
+
+        async createToken(
+            identity: SecurityIdentity,
+            data: CreatePersonalAccessTokenInput
+        ): Promise<UserPersonalAccessToken> {
+            await new CreateAccessTokenDataModel().populate(data).validate();
+
+            const token: UserPersonalAccessToken = {
+                ...data,
+                id: mdbid(),
+                login: identity.id,
+                createdOn: new Date().toISOString()
             };
-        }
-
-        const user: User = {
-            ...data,
-            login,
-            createdOn: new Date().toISOString(),
-            createdBy: identity
-                ? {
-                      id: identity.id,
-                      displayName: identity.displayName,
-                      type: identity.type
-                  }
-                : null
-        };
-
-        await this.executeCallback<UserPlugin["beforeCreate"]>("beforeCreate", {
-            context: this.context,
-            user,
-            inputData: data
-        });
-
-        await db.create({
-            ...dbArgs,
-            data: {
-                PK: `U#${user.login}`,
-                SK: "A",
-                TYPE: "security.user",
-                ...user
+            try {
+                return await storageOperations.createToken({
+                    identity,
+                    token
+                });
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.messagge || "Could not create user access token.",
+                    ex.code || "CREATE_USER_ACCESS_TOKEN_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        token
+                    }
+                );
             }
-        });
+        },
 
-        await this.executeCallback<UserPlugin["afterCreate"]>("afterCreate", {
-            context: this.context,
-            user,
-            inputData: data
-        });
+        async createUser(data: CreateUserInput, options: { auth?: boolean } = {}): Promise<User> {
+            const { security, tenancy } = context;
 
-        const tenant = tenancy.getCurrentTenant();
-        const group = await security.groups.getGroup(tenant, data.group);
-        await security.users.linkUserToTenant(user.login, tenant, group);
+            const auth = "auth" in options ? options.auth : true;
 
-        return user;
-    }
-
-    async deleteToken(login: string, tokenId: string): Promise<boolean> {
-        await this.context.db.delete({
-            ...dbArgs,
-            query: {
-                PK: `U#${login}`,
-                SK: `PAT#${tokenId}`
-            }
-        });
-
-        return true;
-    }
-
-    async deleteUser(login: string): Promise<boolean> {
-        const { db, security } = this.context;
-
-        const permission = await security.getPermission("security.user");
-        if (!permission) {
-            throw new NotAuthorizedError();
-        }
-
-        const user = await this.getUser(login);
-        const identity = security.getIdentity();
-
-        if (!user) {
-            throw new NotFoundError(`User "${login}" was not found!`);
-        }
-
-        if (user.login === identity.id) {
-            throw new WebinyError(`You can't delete your own user account.`);
-        }
-
-        await this.executeCallback<UserPlugin["beforeDelete"]>("beforeDelete", {
-            context: this.context,
-            user
-        });
-
-        const [items] = await db.read({
-            ...dbArgs,
-            query: {
-                PK: `U#${login}`,
-                SK: { $gt: " " }
-            }
-        });
-
-        const batch = db.batch();
-        for (let i = 0; i < items.length; i++) {
-            batch.delete({
-                ...dbArgs,
-                query: {
-                    PK: items[i].PK,
-                    SK: items[i].SK
+            if (auth) {
+                const permission = await security.getPermission("security.user");
+                if (!permission) {
+                    throw new NotAuthorizedError();
                 }
-            });
-        }
-
-        await batch.execute();
-
-        this.loaders.clearLoadersCache(login);
-
-        await this.executeCallback<UserPlugin["afterDelete"]>("afterDelete", {
-            context: this.context,
-            user
-        });
-
-        return true;
-    }
-
-    async getPersonalAccessToken(login: string, tokenId: string): Promise<UserPersonalAccessToken> {
-        const [[token]] = await this.context.db.read<DbUserAccessToken>({
-            ...dbArgs,
-            query: {
-                PK: `U#${login}`,
-                SK: `PAT#${tokenId}`
             }
-        });
 
-        return token;
-    }
+            const login = data.login.toLowerCase();
+            const identity = security.getIdentity();
 
-    async getUser(login: string, options: { auth?: boolean } = {}): Promise<User> {
-        const { security } = this.context;
-        const auth = "auth" in options ? options.auth : true;
+            const existing = await context.security.users.getUser(login, {
+                auth: false
+            });
 
-        if (auth) {
+            if (existing) {
+                throw new WebinyError("User with that login already exists.", "USER_EXISTS");
+            }
+            let createdBy = null;
+            if (identity) {
+                createdBy = {
+                    id: identity.id,
+                    displayName: identity.displayName,
+                    type: identity.type
+                };
+            }
+
+            const user: User = {
+                ...data,
+                id: mdbid(),
+                login,
+                createdOn: new Date().toISOString(),
+                createdBy
+            };
+            let result: User;
+            try {
+                await executeCallback<UserPlugin["beforeCreate"]>(userPlugins, "beforeCreate", {
+                    context,
+                    user,
+                    inputData: data
+                });
+                result = await storageOperations.createUser({
+                    user
+                });
+                await executeCallback<UserPlugin["afterCreate"]>(userPlugins, "afterCreate", {
+                    context,
+                    user: result,
+                    inputData: data
+                });
+                const tenant = tenancy.getCurrentTenant();
+                const group = await security.groups.getGroup(data.group);
+                await security.users.linkUserToTenant(result.login, tenant, group);
+                return result;
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.message || "Could not create user.",
+                    ex.code || "CREATE_USER_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        user: result || user
+                    }
+                );
+            }
+        },
+
+        async deleteToken(id: string): Promise<boolean> {
+            const identity = context.security.getIdentity();
+            if (!identity) {
+                throw new Error("Not authorized!");
+            }
+            const token = await context.security.users.getPersonalAccessToken(identity.id, id);
+
+            if (!token) {
+                throw new NotFoundError(`PAT "${id}" was not found!`);
+            }
+
+            try {
+                await storageOperations.deleteToken({
+                    identity,
+                    token
+                });
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.message || "Could not delete user access token.",
+                    ex.code || "DELETE_USER_ACCESS_TOKEN_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        identity,
+                        token
+                    }
+                );
+            }
+
+            return true;
+        },
+
+        async deleteUser(login: string): Promise<boolean> {
+            const { security } = context;
+
+            const permission = await security.getPermission("security.user");
+            if (!permission) {
+                throw new NotAuthorizedError();
+            }
+
+            const user = await context.security.users.getUser(login);
+            const identity = security.getIdentity();
+
+            if (!user) {
+                throw new NotFoundError(`User "${login}" was not found!`);
+            }
+
+            if (user.login === identity.id) {
+                throw new WebinyError(`You can't delete your own user account.`);
+            }
+
+            try {
+                await executeCallback<UserPlugin["beforeDelete"]>(userPlugins, "beforeDelete", {
+                    context,
+                    user
+                });
+
+                await storageOperations.deleteUser({
+                    user
+                });
+
+                loaders.clearLoadersCache(login);
+
+                await executeCallback<UserPlugin["afterDelete"]>(userPlugins, "afterDelete", {
+                    context,
+                    user
+                });
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.messagge || "Could not delete user.",
+                    ex.code || "DELETE_USER_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        user
+                    }
+                );
+            }
+
+            return true;
+        },
+
+        async getPersonalAccessToken(
+            login: string,
+            tokenId: string
+        ): Promise<UserPersonalAccessToken> {
+            try {
+                return storageOperations.getPersonalAccessToken({
+                    login,
+                    tokenId
+                });
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.messagge || "Could not get user access token.",
+                    ex.code || "GET_USER_ACCESS_TOKEN_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        login,
+                        tokenId
+                    }
+                );
+            }
+        },
+
+        async getUser(login: string, options: { auth?: boolean } = {}): Promise<User> {
+            const { security } = context;
+            const auth = "auth" in options ? options.auth : true;
+
+            if (auth) {
+                const permission = await security.getPermission("security.user");
+
+                if (!permission) {
+                    throw new NotAuthorizedError();
+                }
+            }
+
+            return loaders.getUser.load(login);
+        },
+
+        async getUserAccess(login: string): Promise<TenantAccess[]> {
+            return loaders.getUserAccess.load(login);
+        },
+
+        async getUserByPersonalAccessToken(token: string): Promise<User> {
+            try {
+                return await storageOperations.getUserByPersonalAccessToken({
+                    token
+                });
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.message || "Could not get user via PAT.",
+                    ex.code || "GET_USER_VIA_PAT_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        token
+                    }
+                );
+            }
+        },
+
+        async linkUserToTenant(id: string, tenant: Tenant, group: Group): Promise<void> {
+            const user = await context.security.users.getUser(id, {
+                auth: false
+            });
+            if (!user) {
+                throw new WebinyError("User not found.", "USER_NOT_FOUND", {
+                    id
+                });
+            }
+            const link: TenantAccess = {
+                tenant: {
+                    id: tenant.id,
+                    name: tenant.name
+                },
+                group: {
+                    slug: group.slug,
+                    name: group.name,
+                    permissions: group.permissions
+                }
+            };
+
+            try {
+                await storageOperations.linkUserToTenant({
+                    user,
+                    tenant,
+                    group,
+                    link
+                });
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.messsage || "Cannot link user to tenant.",
+                    ex.code || "LINK_USER_TO_TENANT_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        link,
+                        user
+                    }
+                );
+            }
+            /**
+             * Add the data into cache so it is not loaded again if required in this request.
+             */
+            await loaders.addDataLoaderAccessCache(id, link);
+        },
+
+        async unlinkUserFromTenant(id: string, tenant: Tenant): Promise<void> {
+            const user = await context.security.users.getUser(id, {
+                auth: false
+            });
+            if (!user) {
+                throw new WebinyError("User not found.", "USER_NOT_FOUND", {
+                    id
+                });
+            }
+
+            try {
+                await storageOperations.unlinkUserFromTenant({
+                    tenant,
+                    user
+                });
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.messsage || "Cannot unlink user from tenant.",
+                    ex.code || "UNLINK_USER_FROM_TENANT_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        tenant,
+                        user
+                    }
+                );
+            }
+            await loaders.deleteDataLoaderAccessCache(id, tenant);
+        },
+
+        async listTokens(login: string): Promise<UserPersonalAccessToken[]> {
+            try {
+                return storageOperations.listTokens({
+                    login
+                });
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.messsage || "Cannot list user tokens.",
+                    ex.code || "LIST_TOKENS_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        login
+                    }
+                );
+            }
+        },
+
+        async listUsers(params: { tenant?: string; auth?: boolean } = {}): Promise<User[]> {
+            const { security, tenancy } = context;
+
+            const auth = "auth" in params ? params.auth : true;
+
+            if (auth) {
+                const permission = await security.getPermission("security.user");
+
+                if (!permission) {
+                    throw new NotAuthorizedError();
+                }
+            }
+
+            const tenant = params.tenant || tenancy.getCurrentTenant().id;
+
+            try {
+                return storageOperations.listUsers({
+                    where: {
+                        tenant
+                    }
+                });
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.messsage || "Cannot list users.",
+                    ex.code || "LIST_USERS_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        tenant
+                    }
+                );
+            }
+        },
+
+        async updateToken(
+            login: string,
+            tokenId: string,
+            data: UpdatePersonalAccessTokenInput
+        ): Promise<UpdatePersonalAccessTokenInput> {
+            const { name } = data;
+            await new UpdateAccessTokenDataModel().populate({ name }).validate();
+
+            const original = await context.security.users.getPersonalAccessToken(login, tokenId);
+
+            const token: UserPersonalAccessToken = {
+                ...original,
+                name
+            };
+            try {
+                return await storageOperations.updateToken({
+                    original,
+                    token
+                });
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.messsage || "Cannot update token.",
+                    ex.code || "UPDATE_TOKEN_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        original,
+                        token
+                    }
+                );
+            }
+        },
+
+        async updateUser(login: string, data: UpdateUserInput): Promise<User> {
+            const { security, tenancy } = context;
             const permission = await security.getPermission("security.user");
 
             if (!permission) {
                 throw new NotAuthorizedError();
             }
-        }
 
-        return this.loaders.getUser.load(login);
-    }
-
-    async getUserAccess(login: string): Promise<TenantAccess[]> {
-        return this.loaders.getUserAccess.load(login);
-    }
-
-    async getUserByPersonalAccessToken(token: string): Promise<User> {
-        const [[pat]] = await this.context.db.read<DbUserAccessToken>({
-            ...dbArgs,
-            query: {
-                GSI1_PK: "PAT",
-                GSI1_SK: token
+            const original = await security.users.getUser(login);
+            if (!original) {
+                throw new NotFoundError(`User "${login}" was not found!`);
             }
-        });
 
-        if (!pat) {
-            return null;
-        }
+            const updateData = cloneDeep(data);
 
-        return await this.getUser(pat.login, { auth: false });
-    }
+            const user: User = {
+                ...original,
+                ...updateData
+            };
 
-    async linkUserToTenant(login: string, tenant: Tenant, group: Group): Promise<void> {
-        const data: TenantAccess = {
-            tenant: {
-                id: tenant.id,
-                name: tenant.name
-            },
-            group: {
-                slug: group.slug,
-                name: group.name,
-                permissions: group.permissions
-            }
-        };
+            try {
+                await executeCallback<UserPlugin["beforeUpdate"]>(userPlugins, "beforeUpdate", {
+                    context,
+                    user,
+                    updateData,
+                    inputData: data
+                });
+                const result = await storageOperations.updateUser({
+                    original,
+                    user
+                });
+                await executeCallback<UserPlugin["afterUpdate"]>(userPlugins, "afterUpdate", {
+                    context,
+                    user,
+                    inputData: data
+                });
+                /**
+                 * Cache clear and updating.
+                 */
+                await loaders.updateDataLoaderUserCache(login, updateData);
+                loaders.clearDataLoaderAccessCache(login);
+                /**
+                 * If there is a group defined, remove the existing one and add the new one.
+                 */
+                if (data.group) {
+                    const tenant = tenancy.getCurrentTenant();
+                    await security.users.unlinkUserFromTenant(result.login, tenant);
 
-        await this.context.db.create({
-            ...dbArgs,
-            data: {
-                PK: `U#${login}`,
-                SK: `LINK#T#${tenant.id}#G#${group.slug}`,
-                GSI1_PK: `T#${tenant.id}`,
-                GSI1_SK: `G#${group.slug}#U#${login}`,
-                TYPE: "security.user2tenant",
-                ...data
-            }
-        });
+                    const group = await security.groups.getGroup(data.group);
 
-        await this.loaders.addDataLoaderAccessCache(login, data);
-    }
-
-    async listTokens(login: string): Promise<UserPersonalAccessToken[]> {
-        const [tokens] = await this.context.db.read<DbUserAccessToken>({
-            ...dbArgs,
-            query: {
-                PK: `U#${login}`,
-                SK: { $beginsWith: "PAT#" }
-            }
-        });
-
-        return tokens;
-    }
-
-    async listUsers(params: { tenant?: string; auth?: boolean } = {}): Promise<User[]> {
-        const { db, security, tenancy } = this.context;
-
-        const auth = "auth" in params ? params.auth : true;
-
-        if (auth) {
-            const permission = await security.getPermission("security.user");
-
-            if (!permission) {
-                throw new NotAuthorizedError();
-            }
-        }
-
-        const tenant = params.tenant || tenancy.getCurrentTenant().id;
-
-        const [users] = await db.read<DbUser>({
-            ...dbArgs,
-            query: { GSI1_PK: `T#${tenant}`, GSI1_SK: { $beginsWith: "G#" } }
-        });
-
-        const batch = db.batch();
-        for (let i = 0; i < users.length; i++) {
-            batch.read({
-                ...dbArgs,
-                query: {
-                    PK: users[i].PK,
-                    SK: "A"
+                    await security.users.linkUserToTenant(result.login, tenant, group);
                 }
-            });
-        }
-
-        const results = await batch.execute();
-
-        return results.map(res => res[0][0]);
-    }
-
-    async unlinkUserFromTenant(login: string, tenant: Tenant): Promise<void> {
-        const { db } = this.context;
-        const [[link]] = await db.read<DbItemSecurityUser2Tenant>({
-            ...dbArgs,
-            query: {
-                PK: `U#${login}`,
-                SK: { $beginsWith: `LINK#T#${tenant.id}#G#` }
-            },
-            limit: 1
-        });
-
-        await db.delete({
-            ...dbArgs,
-            query: {
-                PK: link.PK,
-                SK: link.SK
+                return result;
+            } catch (ex) {
+                throw new WebinyError(
+                    ex.messsage || "Cannot update user.",
+                    ex.code || "UPDATE_USER_ERROR",
+                    {
+                        ...(ex.data || {}),
+                        original,
+                        user
+                    }
+                );
             }
-        });
-        await this.loaders.deleteDataLoaderAccessCache(login, tenant);
-    }
-
-    async updateToken(
-        login: string,
-        tokenId: string,
-        data: UpdatePersonalAccessTokenInput
-    ): Promise<UpdatePersonalAccessTokenInput> {
-        const { name } = data;
-        await new UpdateAccessTokenDataModel().populate({ name }).validate();
-
-        await this.context.db.update({
-            ...dbArgs,
-            query: {
-                PK: `U#${login}`,
-                SK: `PAT#${tokenId}`
-            },
-            data: { name }
-        });
-
-        return { name };
-    }
-
-    async updateUser(login: string, data: UpdateUserInput): Promise<User> {
-        const { security, tenancy, db } = this.context;
-        const permission = await security.getPermission("security.user");
-
-        if (!permission) {
-            throw new NotAuthorizedError();
         }
-
-        const user = await security.users.getUser(login);
-        if (!user) {
-            throw new NotFoundError(`User "${login}" was not found!`);
-        }
-
-        const updateData = cloneDeep(data);
-
-        await this.executeCallback<UserPlugin["beforeUpdate"]>("beforeUpdate", {
-            context: this.context,
-            user,
-            updateData,
-            inputData: data
-        });
-
-        Object.assign(user, updateData);
-
-        await db.update({
-            ...dbArgs,
-            query: { PK: `U#${login}`, SK: "A" },
-            data: user
-        });
-
-        await this.executeCallback<UserPlugin["afterUpdate"]>("afterUpdate", {
-            context: this.context,
-            user,
-            inputData: data
-        });
-
-        await this.loaders.updateDataLoaderUserCache(login, updateData);
-        this.loaders.clearDataLoaderAccessCache(login);
-
-        if (data.group) {
-            const tenant = tenancy.getCurrentTenant();
-            await security.users.unlinkUserFromTenant(user.login, tenant);
-
-            const group = await security.groups.getGroup(tenant, data.group);
-
-            await security.users.linkUserToTenant(user.login, tenant, group);
-        }
-
-        return user;
-    }
-}
+    };
+});
